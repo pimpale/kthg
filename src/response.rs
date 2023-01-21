@@ -15,10 +15,17 @@ pub enum AppError {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserMessage {
-    creator_user_id: i64,
-    target_user_id: i64,
-    creation_time: i64,
-    audio_data: String,
+    pub creation_time: i64,
+    pub creator_user_id: i64,
+    pub target_user_id: i64,
+    pub audio_data: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SleepEvent {
+    pub creation_time: i64,
+    pub creator_user_id: i64,
 }
 
 impl std::error::Error for AppError {}

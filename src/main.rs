@@ -1,18 +1,18 @@
-use std::collections::HashMap;
+use std::net::Ipv4Addr;
 use std::str::FromStr;
-use std::{net::Ipv4Addr, sync::Arc};
 
 use actix_web::{middleware, web, App, HttpServer};
-use auth_service_api::response::User;
 use clap::Parser;
 
 use auth_service_api::client::AuthService;
-use tokio::sync::broadcast;
-use tokio::sync::Mutex;
 
 mod db_types;
 mod handlers;
+mod request;
+mod response;
 mod utils;
+
+mod manage_user_message;
 
 mod sleep_event_service;
 mod user_message_service;
@@ -71,15 +71,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let pool = deadpool_postgres::Pool::builder(mgr)
         .max_size(16)
         .build()
-        .map_err(|e| { log::error!("couldn't build database connection pool: {}", e); e })?;
+        .map_err(|e| {
+            log::error!("couldn't build database connection pool: {}", e);
+            e
+        })?;
 
     log::info!("built database connection pool");
 
     // open connection to auth service
     let auth_service = AuthService::new(&auth_service_url);
     log::info!("connected to auth service");
-
-    let user_worker_data = Arc::new(Mutex::new(HashMap::new()));
 
     // start server
     let data = AppData {
@@ -97,13 +98,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             // handle info query
             .service(web::resource("/public/info").route(web::route().to(handlers::info)))
             // submit user message
-            .service(web::resource("/public/user_message/new").route(web::route().to(handlers::user_message_new)))
+            .service(
+                web::resource("/public/user_message/new")
+                    .route(web::route().to(handlers::user_message_new)),
+            )
             // submit sleep event
-            .service(web::resource("/public/sleep_event/new").route(web::route().to(handlers::sleep_event_new)))
+            .service(
+                web::resource("/public/sleep_event/new")
+                    .route(web::route().to(handlers::sleep_event_new)),
+            )
             // view user message
-            .service(web::resource("/public/user_message/view").route(web::route().to(handlers::user_message_view)))
+            .service(
+                web::resource("/public/user_message/view")
+                    .route(web::route().to(handlers::user_message_view)),
+            )
             // view sleep event
-            .service(web::resource("/public/sleep_event/view").route(web::route().to(handlers::sleep_event_view)))
+            .service(
+                web::resource("/public/sleep_event/view")
+                    .route(web::route().to(handlers::sleep_event_view)),
+            )
+            // websocket submit recording
+            .service(
+                web::resource("/public/ws/submit_user_message")
+                    .route(web::route().to(handlers::ws_submit_user_message)),
+            )
     })
     .bind((Ipv4Addr::LOCALHOST, port))?
     .run()

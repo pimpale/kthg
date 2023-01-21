@@ -1,5 +1,4 @@
 use super::db_types::*;
-use todoproxy_api::WebsocketOp;
 use tokio_postgres::GenericClient;
 
 impl From<tokio_postgres::row::Row> for UserMessage {
@@ -32,7 +31,7 @@ pub async fn add(
              VALUES($1, $2, $3)
              RETURNING user_message_id, creation_time
             ",
-            &[&checkpoint_id, &audio_data],
+            &[&creator_user_id, &target_user_id, &audio_data],
         )
         .await?;
 
@@ -60,4 +59,43 @@ pub async fn get_by_user_message_id(
     Ok(result)
 }
 
+pub async fn query(
+    con: &mut impl GenericClient,
+    props: crate::request::UserMessageViewProps,
+) -> Result<Vec<UserMessage>, tokio_postgres::Error> {
+    let sql = [
+        if props.only_recent {
+            "SELECT um.* FROM recent_user_message_by_creator_target_id um"
+        } else {
+            "SELECT um.* FROM user_message_t um"
+        },
+        " WHERE 1 = 1",
+        " AND ($1::bigint[] IS NULL OR um.user_message_id IN $1)",
+        " AND ($2::bigint   IS NULL OR um.creation_time >= $2)",
+        " AND ($3::bigint   IS NULL OR um.creation_time <= $3)",
+        " AND ($4::bigint[] IS NULL OR um.creator_user_id IN $4)",
+        " AND ($5::bigint[] IS NULL OR um.target_user_id IN $5)",
+        " ORDER BY um.user_message_id",
+    ]
+    .join("");
 
+    let stmnt = con.prepare(&sql).await?;
+
+    let results = con
+        .query(
+            &stmnt,
+            &[
+                &props.user_message_id,
+                &props.min_creation_time,
+                &props.max_creation_time,
+                &props.creator_user_id,
+                &props.target_user_id,
+            ],
+        )
+        .await?
+        .into_iter()
+        .map(|x| x.into())
+        .collect();
+
+    Ok(results)
+}

@@ -1,5 +1,4 @@
 use super::db_types::*;
-use todoproxy_api::StateSnapshot;
 use tokio_postgres::GenericClient;
 
 impl From<tokio_postgres::row::Row> for SleepEvent {
@@ -64,4 +63,39 @@ pub async fn get_recent_by_user_id(
         .await?
         .map(|x| x.into());
     Ok(result)
+}
+pub async fn query(
+    con: &mut impl GenericClient,
+    props: crate::request::SleepEventViewProps,
+) -> Result<Vec<SleepEvent>, tokio_postgres::Error> {
+    let sql = [
+        "SELECT se.* FROM sleep_event_t se",
+        " WHERE 1 = 1",
+        " AND ($1::bigint[] IS NULL OR se.sleep_event_id IN $1)",
+        " AND ($2::bigint   IS NULL OR se.creation_time >= $2)",
+        " AND ($3::bigint   IS NULL OR se.creation_time <= $3)",
+        " AND ($4::bigint[] IS NULL OR se.creator_user_id IN $4)",
+        " AND ($5::bigint[] IS NULL OR se.target_user_id IN $5)",
+        " ORDER BY se.sleep_event_id",
+    ]
+    .join("");
+
+    let stmnt = con.prepare(&sql).await?;
+
+    let results = con
+        .query(
+            &stmnt,
+            &[
+                &props.sleep_event_id,
+                &props.min_creation_time,
+                &props.max_creation_time,
+                &props.creator_user_id,
+            ],
+        )
+        .await?
+        .into_iter()
+        .map(|x| x.into())
+        .collect();
+
+    Ok(results)
 }
