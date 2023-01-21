@@ -1,5 +1,5 @@
-CREATE DATABASE todoproxy;
-\c todoproxy;
+CREATE DATABASE kthg;
+\c kthg;
 
 -- Table Structure
 -- Primary Key
@@ -9,30 +9,30 @@ CREATE DATABASE todoproxy;
 
 
 
-drop table if exists checkpoint cascade;
-create table checkpoint(
-  checkpoint_id bigserial primary key,
+drop table if exists user_message cascade;
+create table user_message(
+  user_message_id bigserial primary key,
   creation_time bigint not null default extract(epoch from now()) * 1000,
   creator_user_id bigint not null,
-  jsonval text not null
+  target_user_id bigint not null,
+  audio_data text not null
 );
 
-create view recent_checkpoint_by_user_id as
-  select c.* from checkpoint c
+create view recent_user_message_by_creator_target_id as
+  select um.* from user_message um
   inner join (
-    select max(checkpoint_id) id 
-    from checkpoint
-    group by creator_user_id
+    select max(user_message_id) id 
+    from user_message
+    group by creator_user_id, target_user_id
   ) maxids
-  on maxids.id = c.checkpoint_id;
+  on maxids.id = um.user_message_id;
 
 
-drop table if exists operation cascade;
-create table operation(
-  operation_id bigserial primary key,
+drop table if exists sleep_event cascade;
+create table sleep_event(
+  sleep_event_id bigserial primary key,
   creation_time bigint not null default extract(epoch from now()) * 1000,
-  checkpoint_id bigint not null references checkpoint(checkpoint_id),
-  jsonval text not null
+  creator_user_id bigint not null
 );
 
 
