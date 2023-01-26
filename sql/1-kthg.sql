@@ -15,7 +15,7 @@ create table user_message(
   creation_time bigint not null default extract(epoch from now()) * 1000,
   creator_user_id bigint not null,
   target_user_id bigint not null,
-  audio_data text not null
+  audio_data bytea not null
 );
 
 create view recent_user_message_by_creator_target_id as
@@ -36,11 +36,14 @@ create table sleep_event(
 );
 
 
-
-
-
-
-
+create view recent_sleep_event_by_user_id as
+  select se.* from sleep_event se
+  inner join (
+    select max(sleep_event_id) id 
+    from sleep_event
+    group by creator_user_id
+  ) maxids
+  on maxids.id = se.sleep_event_id;
 
 
 -- drop table if exists checkpoint cascade;

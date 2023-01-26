@@ -1,17 +1,6 @@
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize, Display)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum AppError {
-    DecodeError,
-    InternalServerError,
-    Unauthorized,
-    BadRequest,
-    NotFound,
-    Unknown,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserMessage {
@@ -27,8 +16,6 @@ pub struct SleepEvent {
     pub creation_time: i64,
     pub creator_user_id: i64,
 }
-
-impl std::error::Error for AppError {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

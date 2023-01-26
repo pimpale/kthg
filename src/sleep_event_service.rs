@@ -20,7 +20,7 @@ pub async fn add(
         .query_one(
             "INSERT INTO
              sleep_event(
-                 creator_user_id,
+                 creator_user_id
              )
              VALUES($1)
              RETURNING sleep_event_id, creation_time

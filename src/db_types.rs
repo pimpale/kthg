@@ -4,7 +4,7 @@ pub struct UserMessage {
     pub creation_time: i64,
     pub creator_user_id: i64,
     pub target_user_id: i64,
-    pub audio_data: String,
+    pub audio_data: Vec<u8>,
 }
 
 #[derive(Clone, Debug)]

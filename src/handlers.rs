@@ -5,6 +5,7 @@ use actix_web::{
     http::StatusCode, web, Error, HttpRequest, HttpResponse, Responder, ResponseError,
 };
 use auth_service_api::response::{AuthError, User};
+use base64::Engine;
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +63,11 @@ pub fn report_serde_error(e: serde_json::Error) -> AppError {
     AppError::DecodeError
 }
 
+pub fn report_base64_err(e: base64::DecodeError) -> AppError {
+    log::info!("{}", e);
+    AppError::DecodeError
+}
+
 pub fn report_auth_err(e: AuthError) -> AppError {
     match e {
         AuthError::ApiKeyNonexistent => AppError::Unauthorized,
@@ -95,7 +101,7 @@ pub fn fill_user_message(x: UserMessage) -> response::UserMessage {
         creation_time: x.creation_time,
         creator_user_id: x.creator_user_id,
         target_user_id: x.target_user_id,
-        audio_data: x.audio_data,
+        audio_data: base64::engine::general_purpose::STANDARD_NO_PAD.encode(&x.audio_data),
     }
 }
 
@@ -140,7 +146,9 @@ pub async fn user_message_new(
         &mut *con,
         user.user_id,
         target_user.user_id,
-        req.audio_data.clone(),
+        base64::engine::general_purpose::STANDARD_NO_PAD
+            .decode(&req.audio_data)
+            .map_err(report_base64_err)?,
     )
     .await
     .map_err(report_postgres_err)?;
@@ -212,15 +220,59 @@ pub async fn sleep_event_view(
     Ok(web::Json(resp_sleep_events))
 }
 
+// allows you to submit the message in parts
 pub async fn ws_submit_user_message(
     data: web::Data<AppData>,
     req: HttpRequest,
     stream: web::Payload,
+    query: web::Query<request::UserMessageSubmitProps>,
 ) -> Result<impl Responder, Error> {
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
     // spawn websocket handler (and don't await it) so that the response is returned immediately
-    rt::spawn(manage_user_message::manage_user_message_ws(
-        data, session, msg_stream,
+    rt::spawn(manage_user_message::submit_user_message_ws(
+        data, session, msg_stream, query,
     ));
     Ok(res)
+}
+
+// allows you to receive the message in parts
+pub async fn ws_receive_user_message(
+    data: web::Data<AppData>,
+    req: HttpRequest,
+    stream: web::Payload,
+    query: web::Query<request::UserMessageReceiveProps>,
+) -> Result<impl Responder, Error> {
+    let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
+    // spawn websocket handler (and don't await it) so that the response is returned immediately
+    rt::spawn(manage_user_message::receive_user_message_ws(
+        data, session, msg_stream, query,
+    ));
+    Ok(res)
+}
+
+pub async fn get_recent_user_message_id(
+    data: web::Data<AppData>,
+    query: web::Query<request::GetRecentUserMessageIdProps>,
+) -> Result<impl Responder, Error> {
+    let con: &mut tokio_postgres::Client = &mut *data.pool.get().await.map_err(report_pool_err)?;
+    // get user messages
+    let user_message = user_message_service::get_recent_by_target_id(con, query.target_user_id)
+        .await
+        .map_err(report_postgres_err)?
+        .ok_or(AppError::NotFound)?;
+    // just return the number
+    Ok(user_message.user_message_id.to_string())
+}
+
+pub async fn query_params_sleep_event_new(
+    data: web::Data<AppData>,
+    query: web::Query<request::QueryParamsSleepEventProps>,
+) -> Result<impl Responder, Error> {
+    let con: &mut tokio_postgres::Client = &mut *data.pool.get().await.map_err(report_pool_err)?;
+    // get user messages
+    let sleep_event = sleep_event_service::add(con, query.creator_user_id)
+        .await
+        .map_err(report_postgres_err)?;
+    // just return the number
+    Ok(web::Json(fill_sleep_event(sleep_event)))
 }

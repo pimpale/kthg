@@ -117,13 +117,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 web::resource("/public/sleep_event/view")
                     .route(web::route().to(handlers::sleep_event_view)),
             )
+            // get recent id
+            .service(
+                web::resource("/public/get_recent_user_message_id")
+                    .route(web::route().to(handlers::get_recent_user_message_id)),
+            )
+            // new sleep event via query params
+            .service(
+                web::resource("/public/query_params_sleep_event_new")
+                    .route(web::route().to(handlers::query_params_sleep_event_new)),
+            )
             // websocket submit recording
             .service(
                 web::resource("/public/ws/submit_user_message")
                     .route(web::route().to(handlers::ws_submit_user_message)),
             )
+            // websocket receieve recording
+            .service(
+                web::resource("/public/ws/receive_user_message")
+                    .route(web::route().to(handlers::ws_receive_user_message)),
+            )
     })
-    .bind((Ipv4Addr::LOCALHOST, port))?
+    .bind((Ipv4Addr::new(0, 0, 0, 0), port))?
     .run()
     .await?;
 

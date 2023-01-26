@@ -18,7 +18,7 @@ pub async fn add(
     con: &mut impl GenericClient,
     creator_user_id: i64,
     target_user_id: i64,
-    audio_data: String,
+    audio_data: Vec<u8>,
 ) -> Result<UserMessage, tokio_postgres::Error> {
     let row = con
         .query_one(
@@ -53,6 +53,26 @@ pub async fn get_by_user_message_id(
         .query_opt(
             "SELECT * FROM user_message WHERE user_message_id=$1",
             &[&user_message_id],
+        )
+        .await?
+        .map(|x| x.into());
+    Ok(result)
+}
+
+pub async fn get_recent_by_target_id(
+    con: &mut impl GenericClient,
+    target_user_id: i64,
+) -> Result<Option<UserMessage>, tokio_postgres::Error> {
+    let result = con
+        .query_opt(
+            "
+                SELECT *
+                FROM recent_user_message_by_creator_target_id
+                WHERE target_user_id=$1
+                ORDER BY creation_time
+                LIMIT 1
+            ",
+            &[&target_user_id],
         )
         .await?
         .map(|x| x.into());
